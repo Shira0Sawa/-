@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- 这行代码非常重要，它告诉手机浏览器不要缩放网页，按设备宽度显示 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三角洲 - 护甲/头盔维修计算器</title>
+    <style>
+        body { font-family: 'Microsoft YaHei', sans-serif; background-color: #f4f4f9; padding: 20px; color: #333; margin: 0; }
+        
+        /* PC端布局：默认左右并排 */
+        .main-container { display: flex; gap: 20px; max-width: 1400px; margin: 0 auto; justify-content: center; align-items: flex-start; }
+        
+        /* 面板通用样式，去掉了 min-width，改用 width: 100% 配合 flex */
+        .panel { flex: 1; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); width: 100%; box-sizing: border-box; }
+        
+        h2 { text-align: center; color: #2c3e50; margin-top: 0; padding-bottom: 10px; border-bottom: 2px solid #eee; }
+        
+        .form-group { margin-bottom: 15px; display: flex; align-items: center; }
+        .form-group label { width: 110px; font-weight: bold; font-size: 14px; flex-shrink: 0; }
+        .form-group select, .form-group input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; outline: none; width: 100%; box-sizing: border-box; }
+        .form-group select:focus, .form-group input:focus { border-color: #3498db; }
+        
+        .btn { width: 100%; padding: 10px; background-color: #3498db; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; margin-top: 10px; transition: background 0.3s; }
+        .btn:hover { background-color: #2980b9; }
+        
+        .result-box { margin-top: 20px; padding: 15px; background-color: #ecf0f1; border-radius: 4px; display: none; }
+        .result-box h3 { margin-top: 0; font-size: 16px; color: #2c3e50; border-bottom: 1px dashed #bdc3c7; padding-bottom: 8px;}
+        .result-item { margin-bottom: 8px; font-size: 14px; }
+        .result-item span { font-weight: bold; color: #e74c3c; }
+        
+        .package-table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; font-size: 13px; }
+        .package-table th, .package-table td { border: 1px solid #ddd; padding: 8px 4px; text-align: center; }
+        .package-table th { background-color: #f8f9fa; }
+
+        /* ==========================================
+           手机端适配（当屏幕宽度小于 900px 时生效）
+           ========================================== */
+        @media (max-width: 900px) {
+            body { padding: 10px; }
+            /* 将左右排列改为上下排列 */
+            .main-container { flex-direction: column; gap: 15px; }
+            .panel { padding: 15px; }
+            h2 { font-size: 18px; }
+            
+            /* 稍微缩小标签和字体，节省手机空间 */
+            .form-group label { width: 95px; font-size: 13px; }
+            .form-group select, .form-group input { font-size: 13px; padding: 6px; }
+            .btn { font-size: 14px; padding: 8px; }
+            .result-item { font-size: 13px; }
+            .package-table th, .package-table td { padding: 6px 2px; font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="main-container">
+    <!-- 左侧：头盔计算 -->
+    <div class="panel">
+        <h2>🪖 头盔维修计算</h2>
+        <div class="form-group">
+            <label>选择头盔：</label>
+            <select id="helmetSelect"></select>
+        </div>
+        <div class="form-group">
+            <label>维修模式：</label>
+            <select id="helmetMode" onchange="toggleMode('helmet')">
+                <option value="inside">局内维修</option>
+                <option value="outside">局外维修</option>
+            </select>
+        </div>
+        <div class="form-group" id="helmet_outsideLevelGroup" style="display: none;">
+            <label>维修等级：</label>
+            <select id="helmetRepairLevel">
+                <option value="intermediate">中级维修 (损耗x1.0)</option>
+                <option value="primary">初级维修 (损耗x1.25)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>当前上限：</label>
+            <input type="number" id="helmetCurrentDur" step="0.1" placeholder="例如: 45.8">
+        </div>
+        <div class="form-group">
+            <label>剩余耐久：</label>
+            <input type="number" id="helmetRemainDur" step="0.1" placeholder="例如: 20.5">
+        </div>
+        <button class="btn" onclick="calculate('helmet')">开始计算头盔</button>
+        <div class="result-box" id="helmetResultBox"></div>
+    </div>
+
+    <!-- 右侧：护甲计算 -->
+    <div class="panel">
+        <h2>🛡️ 护甲维修计算</h2>
+        <div class="form-group">
+            <label>选择防弹衣：</label>
+            <select id="armorSelect"></select>
+        </div>
+        <div class="form-group">
+            <label>维修模式：</label>
+            <select id="armorMode" onchange="toggleMode('armor')">
+                <option value="inside">局内维修</option>
+                <option value="outside">局外维修</option>
+            </select>
+        </div>
+        <div class="form-group" id="armor_outsideLevelGroup" style="display: none;">
+            <label>维修等级：</label>
+            <select id="armorRepairLevel">
+                <option value="intermediate">中级维修 (损耗x1.0)</option>
+                <option value="primary">初级维修 (损耗x1.25)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>当前上限：</label>
+            <input type="number" id="armorCurrentDur" step="0.1" placeholder="例如: 45.8">
+        </div>
+        <div class="form-group">
+            <label>剩余耐久：</label>
+            <input type="number" id="armorRemainDur" step="0.1" placeholder="例如: 20.5">
+        </div>
+        <button class="btn" onclick="calculate('armor')">开始计算护甲</button>
+        <div class="result-box" id="armorResultBox"></div>
+    </div>
+</div>
+
+<script>
+// ==========================================
+// 1. 完整真实数据
+// ==========================================
+const gameData = {
+  "armors": {
+    "body_armor": [
+      { "name": "摩托马甲", "protectionLevel": 1, "type": "半甲", "initialMax": 20, "repairLoss": 0.15, "repairPrice": 55, "repairEfficiencies": { "3": 8.8, "6": 8.8, "8": 10.9, "9": 13.0 } },
+      { "name": "尼龙防弹衣", "protectionLevel": 1, "type": "半甲", "initialMax": 25, "repairLoss": 0.09, "repairPrice": 44, "repairEfficiencies": { "3": 8.8, "6": 8.8, "8": 10.9, "9": 13.0 } },
+      { "name": "轻型防弹衣", "protectionLevel": 1, "type": "半甲", "initialMax": 30, "repairLoss": 0.06, "repairPrice": 37, "repairEfficiencies": { "3": 8.8, "6": 8.8, "8": 10.9, "9": 13.0 } },
+      { "name": "安保防弹衣", "protectionLevel": 1, "type": "半甲", "initialMax": 20, "repairLoss": 0.12, "repairPrice": 55, "repairEfficiencies": { "3": 8.8, "6": 8.8, "8": 10.9, "9": 13.0 } },
+      { "name": "简易防刺服", "protectionLevel": 2, "type": "半甲", "initialMax": 30, "repairLoss": 0.15, "repairPrice": 101, "repairEfficiencies": { "2": 8.8, "4": 8.8, "6": 10.9, "7": 13.0 } },
+      { "name": "TG战术防弹衣", "protectionLevel": 2, "type": "半甲", "initialMax": 40, "repairLoss": 0.09, "repairPrice": 84, "repairEfficiencies": { "2": 8.8, "4": 8.8, "6": 10.9, "7": 13.0 } },
+      { "name": "通用战术背心", "protectionLevel": 2, "type": "半甲", "initialMax": 50, "repairLoss": 0.06, "repairPrice": 71, "repairEfficiencies": { "2": 8.8, "4": 8.8, "6": 10.9, "7": 13.0 } },
+      { "name": "HT战术背心", "protectionLevel": 2, "type": "半甲", "initialMax": 35, "repairLoss": 0.12, "repairPrice": 91, "repairEfficiencies": { "2": 8.8, "4": 8.8, "6": 10.9, "7": 13.0 } },
+      { "name": "制式防弹背心", "protectionLevel": 3, "type": "半甲", "initialMax": 50, "repairLoss": 0.05, "repairPrice": 145, "repairEfficiencies": { "1.55": 8.8, "2.5": 8.8, "3.91": 10.9, "5.86": 13.0 } },
+      { "name": "TG-H防弹衣", "protectionLevel": 3, "type": "全甲", "initialMax": 75, "repairLoss": 0.09, "repairPrice": 112, "repairEfficiencies": { "1.95": 8.8, "2.6": 8.8, "4.06": 10.9, "6.09": 13.0 } },
+      { "name": "射手战术背心", "protectionLevel": 3, "type": "全甲", "initialMax": 85, "repairLoss": 0.07, "repairPrice": 138, "repairEfficiencies": { "1.58": 8.8, "2.11": 8.8, "3.29": 10.9, "4.94": 13.0 } },
+      { "name": "Hvk快拆防弹衣", "protectionLevel": 3, "type": "半甲", "initialMax": 60, "repairLoss": 0.04, "repairPrice": 140, "repairEfficiencies": { "1.56": 8.8, "2.08": 8.8, "3.25": 10.9, "4.88": 13.0 } },
+      { "name": "武士防弹背心", "protectionLevel": 4, "type": "半甲", "initialMax": 80, "repairLoss": 0.06, "repairPrice": 168, "repairEfficiencies": { "0.5": 8.8, "1.86": 8.8, "2.92": 10.9, "4.38": 13.0 } },
+      { "name": "DT-AVS防弹衣", "protectionLevel": 4, "type": "全甲", "initialMax": 100, "repairLoss": 0.1, "repairPrice": 221, "repairEfficiencies": { "0.5": 8.8, "1.26": 8.8, "1.97": 10.9, "2.95": 13.0 } },
+      { "name": "MK-2战术背心", "protectionLevel": 4, "type": "全甲", "initialMax": 110, "repairLoss": 0.09, "repairPrice": 233, "repairEfficiencies": { "0.41": 8.8, "1.41": 8.8, "2.21": 10.9, "3.31": 13.0 } },
+      { "name": "突击手防弹背心", "protectionLevel": 4, "type": "全甲", "initialMax": 90, "repairLoss": 0.18, "repairPrice": 248, "repairEfficiencies": { "0.24": 8.8, "1.19": 8.8, "1.87": 10.9, "2.8": 13.0 } },
+      { "name": "HMP特勤防弹衣", "protectionLevel": 4, "type": "半甲", "initialMax": 80, "repairLoss": 0.1, "repairPrice": 262, "repairEfficiencies": { "0.2": 8.8, "1.35": 8.8, "2.11": 10.9, "3.16": 13.0 } },
+      { "name": "精英防弹背心", "protectionLevel": 5, "type": "全甲", "initialMax": 95, "repairLoss": 0.12, "repairPrice": 394, "repairEfficiencies": { "0.19": 8.8, "0.32": 8.8, "1.19": 10.9, "1.78": 13.0 } },
+      { "name": "FS复合防弹衣", "protectionLevel": 5, "type": "全甲", "initialMax": 105, "repairLoss": 0.09, "repairPrice": 587, "repairEfficiencies": { "0.18": 8.8, "0.29": 8.8, "0.81": 10.9, "1.21": 13.0 } },
+      { "name": "重型防弹背心", "protectionLevel": 5, "type": "重甲", "initialMax": 125, "repairLoss": 0.1, "repairPrice": 374, "repairEfficiencies": { "0.15": 8.8, "0.25": 8.8, "1.25": 10.9, "1.88": 13.0 } },
+      { "name": "Hvk-2 防弹衣", "protectionLevel": 5, "type": "重甲", "initialMax": 115, "repairLoss": 0.14, "repairPrice": 325, "repairEfficiencies": { "0.16": 8.8, "0.27": 8.8, "1.44": 10.9, "2.16": 13.0 } },
+      { "name": "金刚防弹衣", "protectionLevel": 6, "type": "重甲", "initialMax": 140, "repairLoss": 0.15, "repairPrice": 757, "repairEfficiencies": { "0.1": 8.8, "0.17": 8.8, "0.27": 10.9, "0.81": 13.0 } },
+      { "name": "特里克MAS2.0装甲", "protectionLevel": 6, "type": "重甲", "initialMax": 125, "repairLoss": 0.06, "repairPrice": 1038, "repairEfficiencies": { "0.1": 8.8, "0.17": 8.8, "0.27": 10.9, "0.59": 13.0 } },
+      { "name": "泰坦防弹装甲", "protectionLevel": 6, "type": "重甲", "initialMax": 150, "repairLoss": 0.09, "repairPrice": 677, "repairEfficiencies": { "0.1": 8.8, "0.17": 8.8, "0.26": 10.9, "0.9": 13.0 } },
+      { "name": "HA-2重型防弹衣", "protectionLevel": 6, "type": "重甲", "initialMax": 115, "repairLoss": 0.11, "repairPrice": 1039, "repairEfficiencies": { "0.12": 8.8, "0.19": 8.8, "0.3": 10.9, "0.59": 13.0 } }
+    ],
+    "helmets": [
+      { "name": "老式钢盔", "protectionLevel": 1, "type": "无", "initialMax": 10, "repairLoss": 0.15, "repairPrice": 87, "repairEfficiencies": { "4": 8.8, "6": 10.9, "8": 13.0 } },
+      { "name": "奔尼帽", "protectionLevel": 1, "type": "无", "initialMax": 10, "repairLoss": 0.08, "repairPrice": 87, "repairEfficiencies": { "4": 8.8, "6": 10.9, "8": 13.0 } },
+      { "name": "户外棒球帽", "protectionLevel": 1, "type": "无", "initialMax": 12, "repairLoss": 0.06, "repairPrice": 72, "repairEfficiencies": { "4": 8.8, "6": 10.9, "8": 13.0 } },
+      { "name": "安保头盔", "protectionLevel": 1, "type": "无", "initialMax": 10, "repairLoss": 0.12, "repairPrice": 87, "repairEfficiencies": { "4": 8.8, "6": 10.9, "8": 13.0 } },
+      { "name": "复古摩托头盔", "protectionLevel": 2, "type": "无", "initialMax": 18, "repairLoss": 0.15, "repairPrice": 153, "repairEfficiencies": { "2": 8.8, "3": 10.9, "4": 13.0 } },
+      { "name": "DRO 战术头盔", "protectionLevel": 2, "type": "无", "initialMax": 15, "repairLoss": 0.08, "repairPrice": 172, "repairEfficiencies": { "2": 8.8, "3": 10.9, "4": 13.0 } },
+      { "name": "MC 防弹头盔", "protectionLevel": 2, "type": "无", "initialMax": 20, "repairLoss": 0.06, "repairPrice": 143, "repairEfficiencies": { "2": 8.8, "3": 10.9, "4": 13.0 } },
+      { "name": "H01 战术头盔", "protectionLevel": 2, "type": "无", "initialMax": 12, "repairLoss": 0.12, "repairPrice": 202, "repairEfficiencies": { "2": 8.8, "3": 10.9, "4": 13.0 } },
+      { "name": "防暴头盔", "protectionLevel": 3, "type": "无", "initialMax": 28, "repairLoss": 0.06, "repairPrice": 200, "repairEfficiencies": { "1.59": 8.8, "2.38": 8.8, "3.97": 10.9, "7.44": 13.0 } },
+      { "name": "DAS防弹头盔", "protectionLevel": 3, "type": "无", "initialMax": 40, "repairLoss": 0.09, "repairPrice": 220, "repairEfficiencies": { "1.44": 8.8, "2.16": 8.8, "3.6": 10.9, "6.75": 13.0 } },
+      { "name": "MC201头盔", "protectionLevel": 3, "type": "无", "initialMax": 34, "repairLoss": 0.13, "repairPrice": 248, "repairEfficiencies": { "1.28": 8.8, "1.92": 8.8, "3.2": 10.9, "6": 13.0 } },
+      { "name": "H07战术头盔", "protectionLevel": 3, "type": "无", "initialMax": 20, "repairLoss": 0.1, "repairPrice": 276, "repairEfficiencies": { "1.15": 8.8, "1.73": 8.8, "2.88": 10.9, "5.39": 13.0 } },
+      { "name": "D6战术头盔", "protectionLevel": 4, "type": "有", "initialMax": 55, "repairLoss": 0.08, "repairPrice": 238, "repairEfficiencies": { "0.21": 8.8, "1.47": 8.8, "2.45": 10.9, "4.59": 13.0 } },
+      { "name": "DICH训练头盔", "protectionLevel": 4, "type": "无", "initialMax": 35, "repairLoss": 0.15, "repairPrice": 587, "repairEfficiencies": { "0.11": 8.8, "0.6": 8.8, "1": 10.9, "1.88": 13.0 } },
+      { "name": "GT1战术头盔", "protectionLevel": 4, "type": "有", "initialMax": 48, "repairLoss": 0.1, "repairPrice": 404, "repairEfficiencies": { "0.12": 8.8, "0.88": 8.8, "1.47": 10.9, "2.76": 13.0 } },
+      { "name": "MHS战术头盔", "protectionLevel": 4, "type": "无", "initialMax": 30, "repairLoss": 0.12, "repairPrice": 448, "repairEfficiencies": { "0.12": 8.8, "0.78": 8.8, "1.3": 10.9, "2.44": 13.0 } },
+      { "name": "Mask-1 铁壁头盔", "protectionLevel": 5, "type": "有", "initialMax": 75, "repairLoss": 0.07, "repairPrice": 366, "repairEfficiencies": { "0.11": 8.8, "0.17": 8.8, "1.4": 10.9, "2.63": 13.0 } },
+      { "name": "DICH-1战术头盔", "protectionLevel": 5, "type": "无", "initialMax": 40, "repairLoss": 0.16, "repairPrice": 1144, "repairEfficiencies": { "0.05": 8.8, "0.07": 8.8, "0.45": 10.9, "0.85": 13.0 } },
+      { "name": "GN重型头盔", "protectionLevel": 5, "type": "有", "initialMax": 50, "repairLoss": 0.07, "repairPrice": 826, "repairEfficiencies": { "0.05": 8.8, "0.08": 8.8, "0.63": 10.9, "1.18": 13.0 } },
+      { "name": "GN久战重型夜视头盔", "protectionLevel": 5, "type": "有", "initialMax": 20, "repairLoss": 0.07, "repairPrice": 826, "repairEfficiencies": { "0.05": 8.8, "0.08": 8.8, "0.63": 10.9, "1.18": 13.0 } },
+      { "name": "GN重型夜视头盔", "protectionLevel": 5, "type": "有", "initialMax": 50, "repairLoss": 0.07, "repairPrice": 826, "repairEfficiencies": { "0.05": 8.8, "0.08": 8.8, "0.63": 10.9, "1.18": 13.0 } },
+      { "name": "H09防暴头盔", "protectionLevel": 5, "type": "有", "initialMax": 45, "repairLoss": 0.16, "repairPrice": 657, "repairEfficiencies": { "0.06": 8.8, "0.09": 8.8, "0.78": 10.9, "1.46": 13.0 } },
+      { "name": "DICH-9重型头盔", "protectionLevel": 6, "type": "无", "initialMax": 50, "repairLoss": 0.1, "repairPrice": 1491, "repairEfficiencies": { "0.03": 8.8, "0.05": 8.8, "0.08": 10.9, "0.65": 13.0 } },
+      { "name": "GT5指挥官头盔", "protectionLevel": 6, "type": "有", "initialMax": 60, "repairLoss": 0.07, "repairPrice": 1737, "repairEfficiencies": { "0.03": 8.8, "0.05": 8.8, "0.08": 10.9, "0.56": 13.0 } },
+      { "name": "H70精英头盔", "protectionLevel": 6, "type": "有", "initialMax": 55, "repairLoss": 0.16, "repairPrice": 1007, "repairEfficiencies": { "0.04": 8.8, "0.05": 8.8, "0.09": 10.9, "0.96": 13.0 } },
+      { "name": "H70夜视精英头盔", "protectionLevel": 6, "type": "有", "initialMax": 55, "repairLoss": 0.16, "repairPrice": 1007, "repairEfficiencies": { "0.04": 8.8, "0.05": 8.8, "0.09": 10.9, "0.96": 13.0 } }
+    ]
+  }
+};
+
+// ==========================================
+// 2. 核心计算类
+// ==========================================
+class ArmorRepairCalculator {
+  calculateRepairLoss(armor, repairData) {
+    try {
+      if (repairData.repairMode === 'inside') {
+        return this.calculateInsideRepair(armor, repairData)
+      } else {
+        return this.calculateOutsideRepair(armor, repairData)
+      }
+    } catch (error) {
+      return { success: false, error: error.message }
+    }
+  }
+
+  calculateInsideRepair(armor, repairData) {
+    const { currentDurability, remainingDurability } = repairData
+    if (!armor || remainingDurability > currentDurability) return { success: false, error: '无效的维修参数' }
+    
+    const initialMax = armor.initialMax
+    const repairLoss = armor.repairLoss
+    if (repairLoss === undefined) return { success: false, error: `护甲 ${armor.name} 缺少维修损耗数据` }
+    
+    const d_initialMax = parseFloat(initialMax.toString())
+    const d_repairLoss = parseFloat(repairLoss.toString())
+    const d_currentMax = parseFloat(currentDurability.toString())
+    const d_remainingDurability = parseFloat(remainingDurability.toString())
+    
+    let ratio = 0
+    if (d_currentMax !== 0) ratio = (d_currentMax - d_remainingDurability) / d_currentMax
+    
+    let logTerm = 0
+    if (d_currentMax > 0 && d_initialMax > 0) logTerm = Math.log10(d_currentMax / d_initialMax)
+    
+    const repairedMax = d_currentMax - d_currentMax * ratio * (d_repairLoss - logTerm)
+    const repairedMaxForCalculation = Math.round(repairedMax * 100) / 100
+    const delta = repairedMaxForCalculation - d_remainingDurability
+    
+    const repairPackages = []
+    const packageTypes = [
+      { key: 'self_made', name: '自制维修包' },
+      { key: 'standard', name: '标准维修包' },
+      { key: 'precision', name: '精密维修包' },
+      { key: 'advanced', name: '高级维修组合' }
+    ]
+    
+    for (const packageType of packageTypes) {
+      const efficiency = this.getInsideRepairEfficiency(armor, packageType.key)
+      let consumption = '暂无数据'
+      if (efficiency === null || efficiency === undefined) consumption = '暂无数据'
+      else if (efficiency === 0) consumption = '无穷大'
+      else if (delta <= 0) consumption = '无效值'
+      else consumption = Math.floor(delta / efficiency)
+      
+      repairPackages.push({ name: packageType.name, efficiency, consumption })
+    }
+
+    return {
+      success: true, mode: '局内维修', armor: armor.name,
+      currentMax: currentDurability, remainingDurability,
+      repairedMax: Math.round(repairedMax * 10) / 10, repairLoss, repairPackages
+    }
+  }
+
+  calculateOutsideRepair(armor, repairData) {
+    const { repairLevel, currentDurability, remainingDurability } = repairData
+    if (!armor || currentDurability <= 0) return { success: false, error: '无效的维修参数' }
+    
+    const repairMultiplier = repairLevel === 'primary' ? 1.25 : 1.0
+    const levelName = repairLevel === 'primary' ? '初级维修' : '中级维修'
+    const baseRepairLoss = armor.repairLoss
+    const baseRepairPrice = armor.repairPrice
+    
+    if (baseRepairLoss === undefined || baseRepairPrice === undefined) return { success: false, error: `护甲 ${armor.name} 缺少维修数据` }
+    
+    const adjustedRepairLoss = Math.min(baseRepairLoss * repairMultiplier, 1.0)
+    const adjustedRepairPrice = baseRepairPrice * repairMultiplier
+    const initialMax = armor.initialMax
+    const currentUpperProcessed = Math.floor(currentDurability)
+    const remainingDurabilityDec = remainingDurability !== undefined ? remainingDurability : currentUpperProcessed
+    
+    const isHelmet = armor.name.includes('头盔') || armor.name.includes('盔') || armor.name.includes('帽');
+    if (isHelmet && currentUpperProcessed < 5) return { success: false, error: `当前头盔上限(${currentUpperProcessed})小于5，不可维修` }
+    if (!isHelmet && currentUpperProcessed < 10) return { success: false, error: `当前护甲上限(${currentUpperProcessed})小于10，不可维修` }
+    
+    try {
+      const term1 = (currentUpperProcessed - remainingDurabilityDec) / currentUpperProcessed
+      if (currentUpperProcessed <= 0 || initialMax <= 0) throw new Error("对数计算参数必须大于0")
+      const logValue = currentUpperProcessed / initialMax
+      if (logValue <= 0) throw new Error("对数计算参数必须大于0")
+      
+      const logTerm = Math.log10(logValue)
+      const term2 = adjustedRepairLoss - logTerm
+      const repairedUpper = currentUpperProcessed - currentUpperProcessed * term1 * term2
+      
+      if (isNaN(repairedUpper) || !isFinite(repairedUpper)) throw new Error("计算结果无效")
+      
+      let finalUpper = Math.floor(repairedUpper)
+      if (finalUpper < 1) finalUpper = 1
+      
+      const remainingInt = Math.floor(remainingDurabilityDec)
+      let repairCost = (finalUpper - remainingInt + 1) * adjustedRepairPrice
+      repairCost = repairCost < 0 ? 0 : Math.round(repairCost)
+      
+      const wearPercentage = (1 - finalUpper / initialMax) * 100
+      let marketStatus = ''
+      const nonTradableEquipments = ["金刚防弹衣", "特里克MAS2.0装甲", "泰坦防弹装甲", "DICH-9重型头盔", "GT5指挥官头盔", "H70夜视精英头盔"]
+      
+      if (nonTradableEquipments.includes(armor.name)) {
+        marketStatus = "不可在市场进行交易"
+      } else {
+        const threshold85 = Math.floor(initialMax * 0.85)
+        const threshold70 = Math.floor(initialMax * 0.70)
+        if (finalUpper >= threshold85) marketStatus = "略有磨损，可在市场出售"
+        else if (finalUpper >= threshold70) marketStatus = "久经沙场，可在市场出售"
+        else marketStatus = "破损不堪，不可在市场出售"
+      }
+
+      return {
+        success: true, mode: '局外维修', armor: armor.name, repairLevel: levelName,
+        initialMax, currentDurability: currentUpperProcessed, remainingDurability: remainingDurabilityDec,
+        finalUpper, repairLoss: adjustedRepairLoss, repairCost,
+        wearPercentage: Math.round(wearPercentage * 10) / 10, marketStatus
+      }
+    } catch (error) {
+      return { success: false, error: `计算错误: ${error.message}` }
+    }
+  }
+
+  getInsideRepairEfficiency(armor, repairType) {
+    if (!armor || !armor.repairEfficiencies) return null
+    const efficiencies = armor.repairEfficiencies
+    const keys = Object.keys(efficiencies)
+    const isOldFormat = keys.some(key => ['3', '6', '8', '9'].includes(key))
+    
+    if (isOldFormat) {
+      const repairTypeToKey = { 'self_made': '3', 'standard': '6', 'precision': '8', 'advanced': '9' }
+      const key = repairTypeToKey[repairType]
+      if (!key || !efficiencies[key]) return null
+      return parseFloat(efficiencies[key]) || null
+    } else {
+      const sortedKeys = keys.sort((a, b) => parseFloat(a) - parseFloat(b))
+      const repairTypeToIndex = { 'self_made': 0, 'standard': 1, 'precision': 2, 'advanced': 3 }
+      const index = repairTypeToIndex[repairType]
+      if (index === undefined || index >= sortedKeys.length) return null
+      return parseFloat(sortedKeys[index]) || null
+    }
+  }
+}
+
+// ==========================================
+// 3. 页面交互逻辑
+// ==========================================
+const calculator = new ArmorRepairCalculator();
+let helmetDataList = []; 
+let armorDataList = [];  
+
+function initSelects() {
+    const helmetSelect = document.getElementById('helmetSelect');
+    helmetDataList = [...gameData.armors.helmets].sort((a, b) => b.protectionLevel - a.protectionLevel);
+    helmetDataList.forEach((item, index) => {
+        const opt = document.createElement('option');
+        opt.value = index;
+        opt.textContent = `[${item.protectionLevel}级] ${item.name}`;
+        helmetSelect.appendChild(opt);
+    });
+
+    const armorSelect = document.getElementById('armorSelect');
+    armorDataList = [...gameData.armors.body_armor].sort((a, b) => b.protectionLevel - a.protectionLevel);
+    armorDataList.forEach((item, index) => {
+        const opt = document.createElement('option');
+        opt.value = index;
+        opt.textContent = `[${item.protectionLevel}级] ${item.name} (${item.type})`;
+        armorSelect.appendChild(opt);
+    });
+}
+
+function toggleMode(type) {
+    const mode = document.getElementById(`${type}Mode`).value;
+    document.getElementById(`${type}_outsideLevelGroup`).style.display = mode === 'outside' ? 'flex' : 'none';
+}
+
+function calculate(type) {
+    let armorData, resultBoxId;
+    
+    if (type === 'helmet') {
+        const index = document.getElementById('helmetSelect').value;
+        armorData = helmetDataList[index];
+        resultBoxId = 'helmetResultBox';
+    } else {
+        const index = document.getElementById('armorSelect').value;
+        armorData = armorDataList[index];
+        resultBoxId = 'armorResultBox';
+    }
+
+    const mode = document.getElementById(`${type}Mode`).value;
+    const repairLevel = document.getElementById(`${type}RepairLevel`).value;
+    const currentDurability = parseFloat(document.getElementById(`${type}CurrentDur`).value);
+    const remainingDurability = parseFloat(document.getElementById(`${type}RemainDur`).value);
+
+    if (isNaN(currentDurability) || isNaN(remainingDurability)) {
+        alert("请输入有效的耐久数值！");
+        return;
+    }
+
+    const params = { repairMode: mode, currentDurability, remainingDurability };
+    if (mode === 'outside') params.repairLevel = repairLevel;
+
+    const result = calculator.calculateRepairLoss(armorData, params);
+    
+    renderResult(resultBoxId, result);
+}
+
+function renderResult(boxId, res) {
+    const box = document.getElementById(boxId);
+    box.style.display = 'block';
+
+    if (!res.success) {
+        box.innerHTML = `<h3 style="color:red;">计算失败</h3><p>${res.error}</p>`;
+        return;
+    }
+
+    let html = `<h3>${res.armor} - ${res.mode}</h3>`;
+    
+    if (res.mode === '局内维修') {
+        html += `
+            <div class="result-item">维修后上限：<span>${res.repairedMax}</span></div>
+            <div class="result-item">当前损耗率：<span>${(res.repairLoss * 100).toFixed(1)}%</span></div>
+            <table class="package-table">
+                <tr><th>维修包</th><th>效率</th><th>需要点数</th></tr>
+                ${res.repairPackages.map(p => `<tr><td>${p.name}</td><td>${p.efficiency}</td><td><strong>${p.consumption}</strong></td></tr>`).join('')}
+            </table>
+        `;
+    } else {
+        html += `
+            <div class="result-item">初始上限：${res.initialMax} | 当前上限：<span>${res.currentDurability}</span></div>
+            <div class="result-item">维修后上限：<span>${res.finalUpper}</span></div>
+            <div class="result-item">装备磨损度：<span>${res.wearPercentage}%</span></div>
+            <div class="result-item">维修总花费：<span>${res.repairCost} 哈夫币</span></div>
+            <div class="result-item">交易行状态：<span>${res.marketStatus}</span></div>
+        `;
+    }
+    
+    box.innerHTML = html;
+}
+
+window.onload = () => {
+    initSelects();
+    toggleMode('helmet');
+    toggleMode('armor');
+};
+</script>
+</body>
+</html>
